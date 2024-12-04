@@ -1,0 +1,18 @@
+---
+services:
+  mqtt-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mqtt-bridge
+    environment:
+      - "MQTT_BROKER=${BROKER_IP}"
+      - "MQTT_PORT=${BROKER_PORT}"
+      - "KAFKA_BROKER=${KAFKA_BROKER}"
+      - "MQTT_TOPIC=${MQTT_TOPIC}"
+      - "KAFKA_TOPIC=${KAFKA_TOPIC}"
+      - 'MQTT_USERNAME=${MQTT_USERNAME}' # CHANGE USERNAME OF YOUR BROKER
+      - 'MQTT_PASSWORD=${MQTT_PASSWORD}' # CHANGE PASSWORD OF YOUR BROKER
+    network_mode: host
+
+
