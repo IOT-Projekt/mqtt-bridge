@@ -1,71 +1,136 @@
 import os
 import json
 import logging
+import signal
+import time
 from kafka import KafkaProducer
 import paho.mqtt.client as mqtt
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# External MQTT and Kafka broker settings
-MQTT_BROKER = os.getenv('MQTT_BROKER', 'mqtt.example.com')  # External MQTT broker
-MQTT_PORT = int(os.getenv('MQTT_PORT', 1883))
-MQTT_TOPIC = os.getenv('MQTT_TOPIC', 'mqtt/topic')
-MQTT_USERNAME = os.getenv('MQTT_USERNAME', None)
-MQTT_PASSWORD = os.getenv('MQTT_PASSWORD', None)
 
-KAFKA_BROKER = os.getenv('KAFKA_BROKER', 'kafka.example.com:9092')  # External Kafka broker
-KAFKA_TOPIC = os.getenv('KAFKA_TOPIC', 'kafka_topic')
+class Config:
+    """Encapsulates configuration for MQTT and Kafka."""
+    def __init__(self):
+        self.MQTT_BROKER = os.getenv("MQTT_BROKER", "mqtt.example.com")
+        self.MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
+        self.MQTT_TOPIC = os.getenv("MQTT_TOPIC", "mqtt/topic")
+        self.MQTT_USERNAME = os.getenv("MQTT_USERNAME", None)
+        self.MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", None)
 
-# Initialize Kafka producer
-kafka_producer = KafkaProducer(
-    bootstrap_servers=KAFKA_BROKER,
-    value_serializer=lambda v: json.dumps(v).encode('utf-8')
-)
+        self.KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka.example.com:9092")
+        self.KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "kafka_topic")
 
-# MQTT callback functions
-def on_connect(client, userdata, flags, rc):
-    if rc == 0:
-        logging.info("Connected to MQTT broker")
-        client.subscribe(MQTT_TOPIC)
-    elif rc == 5:
-        logging.error("Authentication failed: Not authorized")
-    else:
-        logging.error(f"Failed to connect to MQTT broker, return code {rc}")
+    def validate(self):
+        """Validate required configuration fields."""
+        if not self.MQTT_BROKER or not self.KAFKA_BROKER:
+            raise ValueError("MQTT_BROKER and KAFKA_BROKER must be set.")
+        if not self.MQTT_TOPIC or not self.KAFKA_TOPIC:
+            raise ValueError("MQTT_TOPIC and KAFKA_TOPIC must be set.")
 
-def on_message(client, userdata, msg):
-    logging.info(f"Received MQTT message: {msg.topic} -> {msg.payload.decode()}")
+
+class MQTTToKafkaBridge:
+    """Handles the communication bridge between MQTT and Kafka."""
+
+    def __init__(self, config: Config):
+        self.config = config
+        self.kafka_producer = KafkaProducer(
+            bootstrap_servers=self.config.KAFKA_BROKER,
+            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+        )
+        self.mqtt_client = mqtt.Client()
+
+        # MQTT Authentication if needed
+        if self.config.MQTT_USERNAME and self.config.MQTT_PASSWORD:
+            self.mqtt_client.username_pw_set(self.config.MQTT_USERNAME, self.config.MQTT_PASSWORD)
+
+        # Set MQTT callbacks
+        self.mqtt_client.on_connect = self.on_connect
+        self.mqtt_client.on_message = self.on_message
+
+        self.running = True
+
+    def on_connect(self, client, userdata, flags, rc):
+        """Called when the MQTT client connects to the broker."""
+        if rc == 0:
+            logging.info("Connected to MQTT broker")
+            client.subscribe(self.config.MQTT_TOPIC)
+        else:
+            logging.error(f"Failed to connect to MQTT broker, return code {rc}")
+
+    def on_message(self, client, userdata, msg):
+        """Called when an MQTT message is received."""
+        logging.info(f"Received MQTT message: {msg.topic} -> {msg.payload.decode()}")
+        try:
+            self.send_message_to_kafka(msg.payload.decode())
+        except Exception as e:
+            logging.error(f"Failed to publish message to Kafka: {e}")
+
+    def send_message_to_kafka(self, message):
+        """Send message to Kafka with retry logic."""
+        retries = 3
+        for attempt in range(retries):
+            try:
+                self.kafka_producer.send(self.config.KAFKA_TOPIC, value=message)
+                self.kafka_producer.flush()
+                logging.info("Message forwarded to Kafka")
+                break
+            except Exception as e:
+                logging.error(f"Error sending message to Kafka (Attempt {attempt + 1}/{retries}): {e}")
+                if attempt < retries - 1:
+                    time.sleep(5)  # Retry after a short delay
+                else:
+                    logging.error("Max retries reached, message not sent to Kafka")
+
+    def start(self):
+        """Start the MQTT to Kafka bridge."""
+        try:
+            signal.signal(signal.SIGTERM, self._handle_signal)
+            signal.signal(signal.SIGINT, self._handle_signal)
+
+            self.mqtt_client.connect(self.config.MQTT_BROKER, self.config.MQTT_PORT)
+            logging.info(f"Connecting to MQTT broker at {self.config.MQTT_BROKER}:{self.config.MQTT_PORT}")
+            self.mqtt_client.loop_start()
+
+            while self.running:
+                time.sleep(1)
+
+        except Exception as e:
+            logging.error(f"Unexpected error: {e}")
+        finally:
+            self.stop()
+
+    def stop(self):
+        """Gracefully shutdown MQTT and Kafka connections."""
+        logging.info("Stopping MQTT to Kafka bridge...")
+        self.running = False
+        self.mqtt_client.loop_stop()
+        self.mqtt_client.disconnect()
+        self.kafka_producer.close()
+        logging.info("Bridge stopped.")
+
+    def _handle_signal(self, sig, frame):
+        """Handle termination signals."""
+        logging.info(f"Received termination signal: {sig}")
+        self.stop()
+
+
+def main():
+    """Main entry point to initialize and run the bridge."""
     try:
-        # Forward message to Kafka
-        kafka_producer.send(KAFKA_TOPIC, value=msg.payload.decode())
-        kafka_producer.flush()
-        logging.info("Message forwarded to Kafka")
-    except Exception as e:
-        logging.error(f"Failed to publish message to Kafka: {e}")
-
-# MQTT client setup
-mqtt_client = mqtt.Client()
-
-# MQTT authentication if needed
-if MQTT_USERNAME and MQTT_PASSWORD:
-    mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-
-mqtt_client.on_connect = on_connect
-mqtt_client.on_message = on_message
-
-try:
-    mqtt_client.connect(MQTT_BROKER, MQTT_PORT)
-except Exception as e:
-    logging.error(f"Error connecting to MQTT broker: {e}")
-    exit(1)
-
-# Start MQTT loop to handle incoming messages
-if __name__ == "__main__":
-    try:
+        config = Config()
+        config.validate()
+        bridge = MQTTToKafkaBridge(config)
         logging.info("Starting MQTT to Kafka bridge...")
-        mqtt_client.loop_forever()
-    except KeyboardInterrupt:
-        logging.info("Stopping bridge...")
-    finally:
-        mqtt_client.disconnect()
-        kafka_producer.close()
+        bridge.start()
+    except ValueError as ve:
+        logging.error(f"Configuration error: {ve}")
+        exit(1)
+    except Exception as e:
+        logging.error(f"Unexpected error occurred: {e}")
+        exit(1)
+
+
+if __name__ == "__main__":
+    main()
