@@ -54,7 +54,7 @@ mqtt_client.on_connect = on_connect
 mqtt_client.on_message = on_message
 
 try:
-    mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    mqtt_client.connect(MQTT_BROKER, MQTT_PORT)
 except Exception as e:
     logging.error(f"Error connecting to MQTT broker: {e}")
     exit(1)
