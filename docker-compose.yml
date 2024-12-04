@@ -1,9 +1,7 @@
 ---
 services:
   mqtt-bridge:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: svenschmidt1502/mqtt-bridge:latest
     container_name: mqtt-bridge
     environment:
       - 'MQTT_BROKER=${MQTT_BROKER}'
