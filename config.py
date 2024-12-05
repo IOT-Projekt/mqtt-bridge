@@ -13,14 +13,20 @@ class Config:
 
     def _initialize(self):
         """Initialize configuration values."""
+        
+        # MQTT configuration
         self.MQTT_BROKER = os.getenv("MQTT_BROKER", "mqtt.example.com")
         self.MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
         self.MQTT_TOPIC = os.getenv("MQTT_TOPIC", "mqtt/topic")
         self.MQTT_USERNAME = os.getenv("MQTT_USERNAME", None)
         self.MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", None)
 
+        # Kafka configuration
         self.KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka.example.com:9092")
         self.KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "kafka_topic")
+        
+        # Validate configuration
+        self.validate()
 
     def validate(self):
         """Validate required configuration fields."""
