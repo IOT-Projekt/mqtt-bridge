@@ -12,7 +12,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code into the container
+COPY config.py .
 COPY mqtt-bridge.py .
+
 
 # Set the entry point to run the bridge
 ENTRYPOINT ["python", "mqtt-bridge.py"]

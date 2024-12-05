@@ -1,7 +1,8 @@
 import json
 import logging
-from kafka import KafkaProducer
 import signal
+import time
+from kafka import KafkaProducer
 import paho.mqtt.client as mqtt
 from config import Config
 
@@ -15,27 +16,33 @@ class MQTTToKafkaBridge:
     """Handles the communication bridge between MQTT and Kafka."""
 
     def __init__(self):
-        # Set up Kafka producer and MQTT client 
+        logging.info("Initializing Kafka producer...")
         self.kafka_producer = KafkaProducer(
             bootstrap_servers=CONFIG.KAFKA_BROKER,
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
+        logging.info("Kafka producer initialized.")
+
+        logging.info("Initializing MQTT client...")
         self.mqtt_client = mqtt.Client()
 
-        # if MQTT username and password are provided, set them for authentication
+        # MQTT Authentication if needed
         if CONFIG.MQTT_USERNAME and CONFIG.MQTT_PASSWORD:
             self.mqtt_client.username_pw_set(CONFIG.MQTT_USERNAME, CONFIG.MQTT_PASSWORD)
 
-        # Set MQTT callbacks 
+        # Set MQTT callbacks
         self.mqtt_client.on_connect = self.on_connect
         self.mqtt_client.on_message = self.on_message
+
+        self.running = True
+        logging.info("MQTT client initialized.")
 
     def on_connect(self, client, userdata, flags, rc):
         """Called when the MQTT client connects to the broker."""
         if rc == 0:
             logging.info("Connected to MQTT broker")
             client.subscribe(CONFIG.MQTT_TOPIC)
-        else: 
+        else:
             logging.error(f"Failed to connect to MQTT broker, return code {rc}")
 
     def on_message(self, client, userdata, msg):
@@ -54,28 +61,28 @@ class MQTTToKafkaBridge:
         except Exception as e:
             logging.error(f"Failed to send message to Kafka: {e}")
 
-    def _handle_signal(self, sig, frame):
-        """Handle termination signals."""
-        logging.info(f"Received termination signal: {sig}")
-        self.stop()
-
     def start(self):
         """Start the MQTT client loop."""
-        signal.signal(signal.SIGTERM, self._handle_signal)
-        signal.signal(signal.SIGINT, self._handle_signal)
-        
+        logging.info("Connecting to MQTT broker...")
         self.mqtt_client.connect(CONFIG.MQTT_BROKER, CONFIG.MQTT_PORT)
-        try:
-            self.mqtt_client.loop_start()
-        except KeyboardInterrupt:
-            self.stop()
+        self.mqtt_client.loop_start()
+        while self.running:
+            time.sleep(1)
 
     def stop(self):
         """Stop the MQTT client loop."""
+        self.running = False
         self.mqtt_client.loop_stop()
         self.mqtt_client.disconnect()
         self.kafka_producer.close()
 
+def signal_handler(sig, frame):
+    bridge.stop()
+    logging.info("Exiting...")
+    exit(0)
+
 if __name__ == "__main__":
     bridge = MQTTToKafkaBridge()
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
     bridge.start()
