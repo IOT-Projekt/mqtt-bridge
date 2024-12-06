@@ -1,4 +1,6 @@
 import os
+import json
+import logging
 
 class Config:
     """Encapsulates configuration for MQTT and Kafka using Singleton pattern."""
@@ -13,25 +15,37 @@ class Config:
 
     def _initialize(self):
         """Initialize configuration values."""
-        
-        # MQTT configuration
+        # MQTT and Kafka configuration
         self.MQTT_BROKER = os.getenv("MQTT_BROKER", "mqtt.example.com")
         self.MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
-        self.MQTT_TOPIC = os.getenv("MQTT_TOPIC", "mqtt/topic")
+        self.KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka.example.com:9092")
+        
+        # Optional MQTT authentication
         self.MQTT_USERNAME = os.getenv("MQTT_USERNAME", None)
         self.MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", None)
 
-        # Kafka configuration
-        self.KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka.example.com:9092")
-        self.KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "kafka_topic")
+        # MQTT topics and mapping for kafka
+        mqtt_topics = os.getenv("MQTT_TOPICS", '["mqtt/topic"]')
+        self.MQTT_TOPICS = json.loads(mqtt_topics)
+        logging.info(f"MQTT_TOPICS: {mqtt_topics}")
         
-        # Validate configuration
-        self.validate()
+        kafka_topic_mapping = os.getenv("KAFKA_TOPIC_MAPPING", '{}')
+        self.KAFKA_TOPIC_MAPPING = json.loads(kafka_topic_mapping)
+        logging.info(f"KAFKA_TOPIC_MAPPING: {kafka_topic_mapping}")
+        
+        
+        
+        logging.info(f"MQTT_TOPICS: {self.MQTT_TOPICS}")
+        logging.info(f"KAFKA_TOPIC_MAPPING: {self.KAFKA_TOPIC_MAPPING}")
+        logging.info(f"MQTT_BROKER: {self.MQTT_BROKER}")
+        logging.info(f"KAFKA_BROKER: {self.KAFKA_BROKER}")
+        
 
     def validate(self):
         """Validate required configuration fields."""
-        if not self.MQTT_BROKER or not self.KAFKA_BROKER:
-            raise ValueError("MQTT_BROKER and KAFKA_BROKER must be set.")
-        if not self.MQTT_TOPIC or not self.KAFKA_TOPIC:
-            raise ValueError("MQTT_TOPIC and KAFKA_TOPIC must be set.")
-
+        if not self.MQTT_BROKER:
+            raise ValueError("MQTT_BROKER must be set.")
+        if not self.MQTT_TOPICS:
+            raise ValueError("MQTT_TOPICS must be set.")
+        if not self.KAFKA_TOPIC_MAPPING:
+            raise ValueError("KAFKA_TOPIC_MAPPING must be set.")

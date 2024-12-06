@@ -16,48 +16,65 @@ class MQTTToKafkaBridge:
     """Handles the communication bridge between MQTT and Kafka."""
 
     def __init__(self):
+        self.kafka_producer = self.setup_kafka_connection()
+        self.mqtt_client = self.setup_mqtt_client()
+        self.running = True
+
+    def setup_kafka_connection(self):
+        """Initialize Kafka producer."""
         logging.info("Initializing Kafka producer...")
-        self.kafka_producer = KafkaProducer(
+        producer = KafkaProducer(
             bootstrap_servers=CONFIG.KAFKA_BROKER,
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
         logging.info("Kafka producer initialized.")
+        return producer
 
+    def setup_mqtt_client(self):
+        """Initialize MQTT client."""
         logging.info("Initializing MQTT client...")
-        self.mqtt_client = mqtt.Client()
+        client = mqtt.Client()
 
         # MQTT Authentication if needed
         if CONFIG.MQTT_USERNAME and CONFIG.MQTT_PASSWORD:
-            self.mqtt_client.username_pw_set(CONFIG.MQTT_USERNAME, CONFIG.MQTT_PASSWORD)
+            client.username_pw_set(CONFIG.MQTT_USERNAME, CONFIG.MQTT_PASSWORD)
 
         # Set MQTT callbacks
-        self.mqtt_client.on_connect = self.on_connect
-        self.mqtt_client.on_message = self.on_message
+        client.on_connect = self.on_connect
+        client.on_message = self.on_message
 
-        self.running = True
         logging.info("MQTT client initialized.")
+        return client
 
     def on_connect(self, client, userdata, flags, rc):
         """Called when the MQTT client connects to the broker."""
         if rc == 0:
             logging.info("Connected to MQTT broker")
-            client.subscribe(CONFIG.MQTT_TOPIC)
+            for topic in CONFIG.MQTT_TOPICS:
+                client.subscribe(topic)
+                logging.info(f"Subscribed to MQTT topic: {topic}")
         else:
             logging.error(f"Failed to connect to MQTT broker, return code {rc}")
 
     def on_message(self, client, userdata, msg):
         """Called when an MQTT message is received."""
         logging.info(f"Received MQTT message: {msg.topic} -> {msg.payload.decode()}")
+        
+        # Check if the topic has a mappint to a kafka topic and send the message
         try:
-            self.send_message_to_kafka(msg.payload.decode())
+            kafka_topic = CONFIG.KAFKA_TOPIC_MAPPING.get(msg.topic)
+            if kafka_topic:
+                self.send_message_to_kafka(kafka_topic, msg.payload.decode())
+            else:
+                logging.error(f"No Kafka topic mapping found for MQTT topic {msg.topic}")
         except Exception as e:
             logging.error(f"Failed to publish message to Kafka: {e}")
 
-    def send_message_to_kafka(self, message):
-        """Send message to Kafka with retry logic."""
+    def send_message_to_kafka(self, kafka_topic, message):
+        """Send the mqtt message to the specified Kafka topic."""
         try:
-            self.kafka_producer.send(CONFIG.KAFKA_TOPIC, message)
-            logging.info(f"Sent message to Kafka topic {CONFIG.KAFKA_TOPIC}")
+            self.kafka_producer.send(kafka_topic, {'message': message})
+            logging.info(f"Sent message to Kafka topic {kafka_topic}")
         except Exception as e:
             logging.error(f"Failed to send message to Kafka: {e}")
 
