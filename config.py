@@ -33,8 +33,6 @@ class Config:
         self.KAFKA_TOPIC_MAPPING = json.loads(kafka_topic_mapping)
         logging.info(f"KAFKA_TOPIC_MAPPING: {kafka_topic_mapping}")
         
-        
-        
         logging.info(f"MQTT_TOPICS: {self.MQTT_TOPICS}")
         logging.info(f"KAFKA_TOPIC_MAPPING: {self.KAFKA_TOPIC_MAPPING}")
         logging.info(f"MQTT_BROKER: {self.MQTT_BROKER}")
