@@ -75,36 +75,36 @@ class MQTTToKafkaBridge:
         else:
             logging.error(f"Failed to connect to MQTT broker, return code {rc}")
 
-def on_message(self, client, userdata, msg):
-    """Called when an MQTT message is received."""
-    
-    msg_content = msg.payload.decode()
-    
-    logging.info(f"Received MQTT message: {msg.topic} -> {msg_content}")
-    
-    # Check if the message is from MQTT source to avoid infinite loop
-    try:
-        msg_json = json.loads(msg_content)
-        logging.info(f"Message JSON: {msg_json}") #TODO DELETE LATER
-        if msg_json.get("source") != "mqtt":
-            return
-    except json.JSONDecodeError:
-        logging.error("Failed to decode MQTT message as JSON")
+    def on_message(self, client, userdata, msg):
+        """Called when an MQTT message is received."""
+        
+        msg_content = msg.payload.decode()
+        
+        logging.info(f"Received MQTT message: {msg.topic} -> {msg_content}")
+        
+        # Check if the message is from MQTT source to avoid infinite loop
+        try:
+            msg_json = json.loads(msg_content)
+            logging.info(f"Message JSON: {msg_json}") #TODO DELETE LATER
+            if msg_json.get("source") != "mqtt":
+                return
+        except json.JSONDecodeError:
+            logging.error("Failed to decode MQTT message as JSON")
 
-    # Remove the source field to avoid infinite loop
-    msg_json["source"] = ""
-    msg_content = json.dumps(msg_json)
-    logging.info(f"Message content: {msg_content}") #TODO DELETE LATER
-    
-    # Check if the topic has a mapping to a kafka topic and send the message
-    try:
-        kafka_topic = CONFIG.KAFKA_TOPIC_MAPPING.get(msg.topic)
-        if kafka_topic:
-            self.send_message_to_kafka(kafka_topic, msg_content)
-        else:
-            logging.error(f"No Kafka topic mapping found for MQTT topic {msg.topic}")
-    except Exception as e:
-        logging.error(f"Failed to publish message to Kafka: {e}")
+        # Remove the source field to avoid infinite loop
+        msg_json["source"] = ""
+        msg_content = json.dumps(msg_json)
+        logging.info(f"Message content: {msg_content}") #TODO DELETE LATER
+        
+        # Check if the topic has a mapping to a kafka topic and send the message
+        try:
+            kafka_topic = CONFIG.KAFKA_TOPIC_MAPPING.get(msg.topic)
+            if kafka_topic:
+                self.send_message_to_kafka(kafka_topic, msg_content)
+            else:
+                logging.error(f"No Kafka topic mapping found for MQTT topic {msg.topic}")
+        except Exception as e:
+            logging.error(f"Failed to publish message to Kafka: {e}")
             
     def start(self):
         """Start the MQTT client loop and Kafka consumer loop."""
