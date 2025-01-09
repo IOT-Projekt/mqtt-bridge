@@ -148,6 +148,7 @@ class MQTTToKafkaBridge:
         try:
             for mqtt_topic, kt in CONFIG.KAFKA_TOPIC_MAPPING.items():
                 if kt == kafka_topic:
+                    logging.info(f"Found MQTT topic for Kafka topic: {mqtt_topic}") #TODO: remove
                     return mqtt_topic
             return None
         except Exception as e:
