@@ -144,10 +144,15 @@ class MQTTToKafkaBridge:
 
     def get_mqtt_topic_for_kafka_topic(self, kafka_topic):
         """Get the corresponding MQTT topic for a given Kafka topic."""
-        for mqtt_topic, mapped_kafka_topic in CONFIG.KAFKA_TOPIC_MAPPING.items():
-            if mapped_kafka_topic == kafka_topic:
-                return mqtt_topic
-        return None
+        logging.info(f"Getting MQTT topic for Kafka topic: {kafka_topic}") #TODO: remove
+        try:
+            for mqtt_topic, kt in CONFIG.KAFKA_TOPIC_MAPPING.items():
+                if kt == kafka_topic:
+                    return mqtt_topic
+            return None
+        except Exception as e:
+            logging.error(f"Failed to get MQTT topic for Kafka topic: {e}") 
+            return None
 
 def signal_handler(sig, frame):
     bridge.stop()
