@@ -82,7 +82,7 @@ class MQTTToKafkaBridge:
         # Check if the topic has a mapping to a kafka topic and send the message
         try:
             kafka_topic = CONFIG.KAFKA_TOPIC_MAPPING.get(msg.topic)
-            if kafka_topic:
+            if kafka_topic is not None:
                 self.send_message_to_kafka(kafka_topic, msg.payload.decode())
             else:
                 logging.error(f"No Kafka topic mapping found for MQTT topic {msg.topic}")
@@ -99,6 +99,7 @@ class MQTTToKafkaBridge:
 
     def send_message_to_mqtt(self, mqtt_topic, message):
         """Send the Kafka message to the specified MQTT topic."""
+        logging.info(f"Sending message to MQTT topic: {mqtt_topic}") #TODO: remove
         try:
             self.mqtt_client.publish(mqtt_topic, message)
             logging.info(f"Sent message to MQTT topic {mqtt_topic}")
@@ -127,7 +128,7 @@ class MQTTToKafkaBridge:
                     
                     logging.info(f"Will forward message to MQTT") #TODO: remove
                     mqtt_topic = self.get_mqtt_topic_for_kafka_topic(message.topic)
-                    if mqtt_topic:
+                    if mqtt_topic is not None:
                         self.send_message_to_mqtt(mqtt_topic, message.value['message'])
                     else:
                         logging.error(f"No MQTT topic mapping found for Kafka topic {message.topic}")
