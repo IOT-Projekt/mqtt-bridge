@@ -132,15 +132,17 @@ class MQTTToKafkaBridge:
             try:
                 for message in self.kafka_consumer:
                     logging.info(f"Received Kafka message: {message.topic} -> {message.value}") #TODO: remove
-                    logging.info(f"Source of message: {message.value.get('message').get('source')}") #TODO: remove
+                    message_json = json.loads(message.value.get("message"))
+                    
+                    logging.info(f"Message JSON: {message_json}") #TODO DELETE LATER
                     # Check if the message is from Kafka source to avoid infinite loop
-                    if message.value.get("message").get("source") != "kafka":
+                    if message_json.get("source") != "kafka":
                         continue
                     
                     logging.info(f"Will forward message to MQTT") #TODO: remove
                     mqtt_topic = self.get_mqtt_topic_for_kafka_topic(message.topic)
                     if mqtt_topic is not None:
-                        self.send_message_to_mqtt(mqtt_topic, json.dumps(message.value))
+                        self.send_message_to_mqtt(mqtt_topic, json.dumps(message_json))
                     else:
                         logging.error(f"No MQTT topic mapping found for Kafka topic {message.topic}")
             except Exception as e:
