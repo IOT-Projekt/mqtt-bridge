@@ -76,18 +76,9 @@ class MQTTToKafkaBridge:
         logging.info(f"Received MQTT message: {msg.topic} -> {msg_content}")
         
         # Check if the message is from MQTT source to avoid infinite loop
-        try:
-            msg_json = json.loads(msg_content)
-            logging.info(f"Message JSON: {msg_json}") #TODO DELETE LATER
-            if msg_json.get("source") != "mqtt":
-                return
-        except json.JSONDecodeError:
-            logging.error("Failed to decode MQTT message as JSON")
-
-        # Remove the source field to avoid infinite loop
-        msg_json["source"] = ""
-        msg_content = json.dumps(msg_json)
-        logging.info(f"Message content: {msg_content}") #TODO DELETE LATER
+        msg_json = json.loads(msg_content)
+        if msg_json.get("source") != "mqtt":
+            return
         
         # Check if the topic has a mapping to a kafka topic and send the message
         try:
@@ -125,7 +116,14 @@ class MQTTToKafkaBridge:
         logging.info("Starting Kafka consumer loop...")
         while self.running:
             for message in self.kafka_consumer:
-                logging.info(f"Received Kafka message: {message.topic} -> {message.value}")
+                
+                logging.info(f"Received Kafka message: {message.topic} -> {message.value}") #TODO: remove
+                
+                # Check if the message is from Kafka source to avoid infinite loop
+                if message.value.get("source") != "kafka":
+                    continue
+                
+                logging.info(f"Will forward message to MQTT") #TODO: remove
                 mqtt_topic = self.get_mqtt_topic_for_kafka_topic(message.topic)
                 if mqtt_topic:
                     self.send_message_to_mqtt(mqtt_topic, message.value['message'])
