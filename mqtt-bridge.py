@@ -2,7 +2,7 @@ import json
 import logging
 import signal
 import time
-from kafka import KafkaProducer
+from kafka import KafkaProducer, KafkaConsumer
 import paho.mqtt.client as mqtt
 from config import Config
 
@@ -16,11 +16,12 @@ class MQTTToKafkaBridge:
     """Handles the communication bridge between MQTT and Kafka."""
 
     def __init__(self):
-        self.kafka_producer = self.setup_kafka_connection()
+        self.kafka_producer = self.setup_kafka_producer()
+        self.kafka_consumer = self.setup_kafka_consumer()
         self.mqtt_client = self.setup_mqtt_client()
         self.running = True
 
-    def setup_kafka_connection(self):
+    def setup_kafka_producer(self):
         """Initialize Kafka producer."""
         logging.info("Initializing Kafka producer...")
         producer = KafkaProducer(
@@ -29,6 +30,17 @@ class MQTTToKafkaBridge:
         )
         logging.info("Kafka producer initialized.")
         return producer
+
+    def setup_kafka_consumer(self):
+        """Initialize Kafka consumer."""
+        logging.info("Initializing Kafka consumer...")
+        consumer = KafkaConsumer(
+            *CONFIG.KAFKA_TOPIC_MAPPING.values(),
+            bootstrap_servers=CONFIG.KAFKA_BROKER,
+            value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+        )
+        logging.info("Kafka consumer initialized.")
+        return consumer
 
     def setup_mqtt_client(self):
         """Initialize MQTT client."""
@@ -58,13 +70,30 @@ class MQTTToKafkaBridge:
 
     def on_message(self, client, userdata, msg):
         """Called when an MQTT message is received."""
-        logging.info(f"Received MQTT message: {msg.topic} -> {msg.payload.decode()}")
         
-        # Check if the topic has a mappint to a kafka topic and send the message
+        msg_content = msg.payload.decode()
+        
+        logging.info(f"Received MQTT message: {msg.topic} -> {msg_content}")
+        
+        # Check if the message is from MQTT source to avoid infinite loop
+        try:
+            msg_json = json.loads(msg_content)
+            logging.info(f"Message JSON: {msg_json}") #TODO DELETE LATER
+            if msg_json.get("source") != "mqtt":
+                return
+        except json.JSONDecodeError:
+            logging.error("Failed to decode MQTT message as JSON")
+
+        # Remove the source field to avoid infinite loop
+        msg_json.pop("source", None)
+        msg_content = json.dumps(msg_json)
+        logging.info(f"Message content: {msg_content}") #TODO DELETE LATER
+        
+        # Check if the topic has a mapping to a kafka topic and send the message
         try:
             kafka_topic = CONFIG.KAFKA_TOPIC_MAPPING.get(msg.topic)
             if kafka_topic:
-                self.send_message_to_kafka(kafka_topic, msg.payload.decode())
+                self.send_message_to_kafka(kafka_topic, msg_content)
             else:
                 logging.error(f"No Kafka topic mapping found for MQTT topic {msg.topic}")
         except Exception as e:
@@ -78,20 +107,45 @@ class MQTTToKafkaBridge:
         except Exception as e:
             logging.error(f"Failed to send message to Kafka: {e}")
 
+    def send_message_to_mqtt(self, mqtt_topic, message):
+        """Send the Kafka message to the specified MQTT topic."""
+        try:
+            self.mqtt_client.publish(mqtt_topic, message)
+            logging.info(f"Sent message to MQTT topic {mqtt_topic}")
+        except Exception as e:
+            logging.error(f"Failed to send message to MQTT: {e}")
+
     def start(self):
-        """Start the MQTT client loop."""
+        """Start the MQTT client loop and Kafka consumer loop."""
         logging.info("Connecting to MQTT broker...")
         self.mqtt_client.connect(CONFIG.MQTT_BROKER, CONFIG.MQTT_PORT)
+        logging.info("Starting MQTT client loop...")
         self.mqtt_client.loop_start()
+        
+        logging.info("Starting Kafka consumer loop...")
         while self.running:
-            time.sleep(1)
+            for message in self.kafka_consumer:
+                logging.info(f"Received Kafka message: {message.topic} -> {message.value}")
+                mqtt_topic = self.get_mqtt_topic_for_kafka_topic(message.topic)
+                if mqtt_topic:
+                    self.send_message_to_mqtt(mqtt_topic, message.value['message'])
+                else:
+                    logging.error(f"No MQTT topic mapping found for Kafka topic {message.topic}")
 
     def stop(self):
-        """Stop the MQTT client loop."""
+        """Stop the MQTT client loop and Kafka consumer loop."""
         self.running = False
         self.mqtt_client.loop_stop()
         self.mqtt_client.disconnect()
         self.kafka_producer.close()
+        self.kafka_consumer.close()
+
+    def get_mqtt_topic_for_kafka_topic(self, kafka_topic):
+        """Get the corresponding MQTT topic for a given Kafka topic."""
+        for mqtt_topic, mapped_kafka_topic in CONFIG.KAFKA_TOPIC_MAPPING.items():
+            if mapped_kafka_topic == kafka_topic:
+                return mqtt_topic
+        return None
 
 def signal_handler(sig, frame):
     bridge.stop()
