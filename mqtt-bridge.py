@@ -128,7 +128,7 @@ class MQTTToKafkaBridge:
                     logging.info(f"Will forward message to MQTT") #TODO: remove
                     mqtt_topic = self.get_mqtt_topic_for_kafka_topic(message.topic)
                     if mqtt_topic is not None:
-                        self.send_message_to_mqtt(mqtt_topic, json.dump(message.value))
+                        self.send_message_to_mqtt(mqtt_topic, json.dumps(message.value))
                     else:
                         logging.error(f"No MQTT topic mapping found for Kafka topic {message.topic}")
             except Exception as e:
