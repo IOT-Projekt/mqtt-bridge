@@ -132,9 +132,9 @@ class MQTTToKafkaBridge:
             try:
                 for message in self.kafka_consumer:
                     logging.info(f"Received Kafka message: {message.topic} -> {message.value}") #TODO: remove
-                    logging.info(f"Source of message: {message.value.get('source')}") #TODO: remove
+                    logging.info(f"Source of message: {message.value.get('message').get("source")}") #TODO: remove
                     # Check if the message is from Kafka source to avoid infinite loop
-                    if message.value.get("source") != "kafka":
+                    if message.value.get("message").get("source") != "kafka":
                         continue
                     
                     logging.info(f"Will forward message to MQTT") #TODO: remove
