@@ -90,11 +90,6 @@ class MQTTToKafkaBridge:
                 return
         except json.JSONDecodeError:
             logging.error("Failed to decode MQTT message as JSON")
-
-        # Remove the source field to avoid infinite loop
-        msg_json["source"] = ""
-        msg_content = json.dumps(msg_json)
-        logging.info(f"Message content: {msg_content}") #TODO DELETE LATER
         
         # Check if the topic has a mapping to a kafka topic and send the message
         try:
