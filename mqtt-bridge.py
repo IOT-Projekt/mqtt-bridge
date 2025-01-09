@@ -129,13 +129,13 @@ class MQTTToKafkaBridge:
                     logging.info(f"Will forward message to MQTT") #TODO: remove
                     mqtt_topic = self.get_mqtt_topic_for_kafka_topic(message.topic)
                     if mqtt_topic is not None:
-                        self.send_message_to_mqtt(mqtt_topic, message.value['message'])
+                        self.send_message_to_mqtt(mqtt_topic, message.value)
                     else:
                         logging.error(f"No MQTT topic mapping found for Kafka topic {message.topic}")
             except Exception as e:
                 logging.error(f"Error processing Kafka message: {e}")
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the MQTT client loop and Kafka consumer loop."""
         self.running = False
         self.mqtt_client.loop_stop()
@@ -143,7 +143,7 @@ class MQTTToKafkaBridge:
         self.kafka_producer.close()
         self.kafka_consumer.close()
 
-    def get_mqtt_topic_for_kafka_topic(self, kafka_topic):
+    def get_mqtt_topic_for_kafka_topic(self, kafka_topic) -> str:
         """Get the corresponding MQTT topic for a given Kafka topic."""
         logging.info(f"Getting MQTT topic for Kafka topic: {kafka_topic}") #TODO: remove
         try:
