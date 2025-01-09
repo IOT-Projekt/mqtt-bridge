@@ -116,6 +116,8 @@ class MQTTToKafkaBridge:
         logging.info("Starting Kafka consumer loop...")
         while self.running:
             for message in self.kafka_consumer:
+                if message is None:
+                    continue
                 
                 logging.info(f"Received Kafka message: {message.topic} -> {message.value}") #TODO: remove
                 logging.info(f"Source of message: {message.value.get('source')}") #TODO: remove
