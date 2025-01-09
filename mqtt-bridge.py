@@ -85,7 +85,7 @@ class MQTTToKafkaBridge:
             logging.error("Failed to decode MQTT message as JSON")
 
         # Remove the source field to avoid infinite loop
-        msg_json.pop("source", None)
+        msg_json["source"] = ""
         msg_content = json.dumps(msg_json)
         logging.info(f"Message content: {msg_content}") #TODO DELETE LATER
         
