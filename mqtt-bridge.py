@@ -100,6 +100,8 @@ class MQTTToKafkaBridge:
     def send_message_to_mqtt(self, mqtt_topic, message):
         """Send the Kafka message to the specified MQTT topic."""
         logging.info(f"Sending message to MQTT topic: {mqtt_topic}") #TODO: remove
+        logging.info(f"Message: {message}") #TODO: remove
+        logging.info(f"Message type: {type(message)}") #TODO: remove
         try:
             self.mqtt_client.publish(mqtt_topic, message)
             logging.info(f"Sent message to MQTT topic {mqtt_topic}")
@@ -117,9 +119,6 @@ class MQTTToKafkaBridge:
         while self.running:
             try:
                 for message in self.kafka_consumer:
-                    if message is None:
-                        continue
-                    
                     logging.info(f"Received Kafka message: {message.topic} -> {message.value}") #TODO: remove
                     logging.info(f"Source of message: {message.value.get('source')}") #TODO: remove
                     # Check if the message is from Kafka source to avoid infinite loop
