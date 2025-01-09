@@ -106,6 +106,25 @@ class MQTTToKafkaBridge:
         except Exception as e:
             logging.error(f"Failed to publish message to Kafka: {e}")
             
+    def send_message_to_kafka(self, kafka_topic, message):
+        """Send the mqtt message to the specified Kafka topic."""
+        try:
+            self.kafka_producer.send(kafka_topic, {'message': message})
+            logging.info(f"Sent message to Kafka topic {kafka_topic}")
+        except Exception as e:
+            logging.error(f"Failed to send message to Kafka: {e}")
+            
+    def send_message_to_mqtt(self, mqtt_topic, message):
+        """Send the Kafka message to the specified MQTT topic."""
+        logging.info(f"Sending message to MQTT topic: {mqtt_topic}") #TODO: remove
+        logging.info(f"Message: {message}") #TODO: remove
+        logging.info(f"Message type: {type(message)}") #TODO: remove
+        try:
+            self.mqtt_client.publish(mqtt_topic, message)
+            logging.info(f"Sent message to MQTT topic {mqtt_topic}")
+        except Exception as e:
+            logging.error(f"Failed to send message to MQTT: {e}")
+            
     def start(self):
         """Start the MQTT client loop and Kafka consumer loop."""
         logging.info("Connecting to MQTT broker...")
