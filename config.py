@@ -24,16 +24,11 @@ class Config:
         self.MQTT_USERNAME = os.getenv("MQTT_USERNAME", None)
         self.MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", None)
 
-        # MQTT topics and mapping for kafka
-        mqtt_topics = os.getenv("MQTT_TOPICS", '["mqtt/topic"]')
-        self.MQTT_TOPICS = json.loads(mqtt_topics)
-        logging.info(f"MQTT_TOPICS: {mqtt_topics}")
-        
+        # MQTT topics mapping to Kafka topics        
         kafka_topic_mapping = os.getenv("KAFKA_TOPIC_MAPPING", '{}')
         self.KAFKA_TOPIC_MAPPING = json.loads(kafka_topic_mapping)
         logging.info(f"KAFKA_TOPIC_MAPPING: {kafka_topic_mapping}")
         
-        logging.info(f"MQTT_TOPICS: {self.MQTT_TOPICS}")
         logging.info(f"KAFKA_TOPIC_MAPPING: {self.KAFKA_TOPIC_MAPPING}")
         logging.info(f"MQTT_BROKER: {self.MQTT_BROKER}")
         logging.info(f"KAFKA_BROKER: {self.KAFKA_BROKER}")

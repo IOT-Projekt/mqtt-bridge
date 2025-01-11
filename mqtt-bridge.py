@@ -69,7 +69,7 @@ class MQTTToKafkaBridge:
         """Called when the MQTT client connects to the broker."""
         if rc == 0:
             logging.info("Connected to MQTT broker")
-            for topic in CONFIG.MQTT_TOPICS:
+            for topic in CONFIG.KAFKA_TOPIC_MAPPING.keys():
                 client.subscribe(topic)
                 logging.info(f"Subscribed to MQTT topic: {topic}")
         else:
