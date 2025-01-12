@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code into the container
 COPY config.py .
-COPY mqtt_kafka_bridge .
+COPY mqtt_kafka_bridge.py .
 
 
 # Set the entry point to run the bridge
