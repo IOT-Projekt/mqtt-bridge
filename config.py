@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from typing import Dict
 
 class Config:
     """Encapsulates configuration for MQTT and Kafka using Singleton pattern."""
@@ -16,17 +17,17 @@ class Config:
     def _initialize(self):
         """Initialize configuration values."""
         # MQTT and Kafka configuration
-        self.MQTT_BROKER = os.getenv("MQTT_BROKER", "mqtt.example.com")
-        self.MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
-        self.KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka.example.com:9092")
+        self.MQTT_BROKER: str = os.getenv("MQTT_BROKER", "mqtt.example.com")
+        self.MQTT_PORT: int = int(os.getenv("MQTT_PORT", 1883))
+        self.KAFKA_BROKER: str = os.getenv("KAFKA_BROKER", "kafka.example.com:9092")
         
         # Optional MQTT authentication
-        self.MQTT_USERNAME = os.getenv("MQTT_USERNAME", None)
-        self.MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", None)
+        self.MQTT_USERNAME: str = os.getenv("MQTT_USERNAME", None)
+        self.MQTT_PASSWORD: str = os.getenv("MQTT_PASSWORD", None)
 
         # MQTT topics mapping to Kafka topics        
-        kafka_topic_mapping = os.getenv("KAFKA_TOPIC_MAPPING", '{}')
-        self.KAFKA_TOPIC_MAPPING = json.loads(kafka_topic_mapping)
+        kafka_topic_mapping: str = os.getenv("KAFKA_TOPIC_MAPPING", '{}')
+        self.KAFKA_TOPIC_MAPPING: Dict[str, str] = json.loads(kafka_topic_mapping)
         logging.info(f"KAFKA_TOPIC_MAPPING: {kafka_topic_mapping}")
         
         logging.info(f"KAFKA_TOPIC_MAPPING: {self.KAFKA_TOPIC_MAPPING}")

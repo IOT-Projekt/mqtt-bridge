@@ -1,6 +1,7 @@
 import json
 import logging
 import signal
+from typing import Any, Dict, Optional
 from kafka import KafkaProducer, KafkaConsumer
 import paho.mqtt.client as mqtt
 from config import Config
@@ -9,18 +10,18 @@ from config import Config
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Load configuration as a global constant
-CONFIG = Config()
+CONFIG: Config = Config()
 
 class MQTTToKafkaBridge:
     """Handles the communication bridge between MQTT and Kafka."""
 
-    def __init__(self):
-        self.kafka_producer = self.setup_kafka_producer()
-        self.kafka_consumer = self.setup_kafka_consumer()
-        self.mqtt_client = self.setup_mqtt_client()
-        self.running = True
+    def __init__(self) -> None:
+        self.kafka_producer: KafkaProducer = self.setup_kafka_producer()
+        self.kafka_consumer: KafkaConsumer = self.setup_kafka_consumer()
+        self.mqtt_client: mqtt.Client = self.setup_mqtt_client()
+        self.running: bool = True
 
-    def setup_kafka_producer(self):
+    def setup_kafka_producer(self) -> KafkaProducer:
         """Initialize Kafka producer."""
         logging.info("Initializing Kafka producer...")
         producer = KafkaProducer(
@@ -30,7 +31,7 @@ class MQTTToKafkaBridge:
         logging.info("Kafka producer initialized.")
         return producer
 
-    def setup_kafka_consumer(self):
+    def setup_kafka_consumer(self) -> KafkaConsumer:
         """Initialize Kafka consumer."""
         logging.info("Initializing Kafka consumer...")
         consumer = KafkaConsumer(
@@ -41,7 +42,7 @@ class MQTTToKafkaBridge:
         logging.info("Kafka consumer initialized.")
         return consumer
 
-    def json_deserializer(self, message):
+    def json_deserializer(self, message: bytes) -> Optional[Dict[str, Any]]:
         """Deserialize JSON message."""
         try:
             return json.loads(message.decode("utf-8"))
@@ -49,23 +50,23 @@ class MQTTToKafkaBridge:
             logging.error(f"Failed to decode JSON message: {e}")
             return None
 
-    def setup_mqtt_client(self):
+    def setup_mqtt_client(self) -> mqtt.Client:
         """Initialize MQTT client."""
         logging.info("Initializing MQTT client...")
         client = mqtt.Client()
 
-        # MQTT Authentication if needed
+        # if username and password are set, use them for authentication
         if CONFIG.MQTT_USERNAME and CONFIG.MQTT_PASSWORD:
             client.username_pw_set(CONFIG.MQTT_USERNAME, CONFIG.MQTT_PASSWORD)
 
-        # Set MQTT callbacks
-        client.on_connect = self.on_connect
-        client.on_message = self.on_message
+        # Set own method callbacks
+        client.on_connect = self.on_mqtt_connect
+        client.on_message = self.on_mqtt_message
 
         logging.info("MQTT client initialized.")
         return client
 
-    def on_connect(self, client, userdata, flags, rc):
+    def on_mqtt_connect(self, client: mqtt.Client, userdata, flags, rc: int) -> None:
         """Called when the MQTT client connects to the broker."""
         if rc == 0:
             logging.info("Connected to MQTT broker")
@@ -75,16 +76,16 @@ class MQTTToKafkaBridge:
         else:
             logging.error(f"Failed to connect to MQTT broker, return code {rc}")
 
-    def on_message(self, client, userdata, msg):
+    def on_mqtt_message(self, client: mqtt.Client, userdata, msg: mqtt.MQTTMessage) -> None:
         """Called when an MQTT message is received."""
         
-        msg_content = msg.payload.decode()
+        msg_content: str = msg.payload.decode()
         
         logging.info(f"Received MQTT message: {msg.topic} -> {msg_content}")
         
         # Check if the message is from MQTT source to avoid infinite loop
         try:
-            msg_json = json.loads(msg_content)
+            msg_json: Dict[str, Any] = json.loads(msg_content)
             logging.info(f"Message JSON: {msg_json}") #TODO DELETE LATER
             if msg_json.get("source") != "mqtt":
                 return
@@ -101,7 +102,7 @@ class MQTTToKafkaBridge:
         except Exception as e:
             logging.error(f"Failed to publish message to Kafka: {e}")
             
-    def send_message_to_kafka(self, kafka_topic, message):
+    def send_message_to_kafka(self, kafka_topic: str, message: str) -> None:
         """Send the mqtt message to the specified Kafka topic."""
         try:
             self.kafka_producer.send(kafka_topic, {'message': message})
@@ -109,7 +110,7 @@ class MQTTToKafkaBridge:
         except Exception as e:
             logging.error(f"Failed to send message to Kafka: {e}")
             
-    def send_message_to_mqtt(self, mqtt_topic, message):
+    def send_message_to_mqtt(self, mqtt_topic: str, message: mqtt.PayloadType) -> None:
         """Send the Kafka message to the specified MQTT topic."""
         logging.info(f"Sending message to MQTT topic: {mqtt_topic}") #TODO: remove
         logging.info(f"Message: {message}") #TODO: remove
@@ -120,13 +121,15 @@ class MQTTToKafkaBridge:
         except Exception as e:
             logging.error(f"Failed to send message to MQTT: {e}")
             
-    def start(self):
+    def start(self) -> None:
         """Start the MQTT client loop and Kafka consumer loop."""
+        # start mqtt client
         logging.info("Connecting to MQTT broker...")
         self.mqtt_client.connect(CONFIG.MQTT_BROKER, CONFIG.MQTT_PORT)
         logging.info("Starting MQTT client loop...")
         self.mqtt_client.loop_start()
         
+        # start kafka consumer
         logging.info("Starting Kafka consumer loop...")
         while self.running:
             try:
@@ -135,7 +138,7 @@ class MQTTToKafkaBridge:
                     message_json = json.loads(message.value.get("message"))
                     
                     logging.info(f"Message JSON: {message_json}") #TODO DELETE LATER
-                    # Check if the message is from Kafka source to avoid infinite loop
+                    # Check if the message is from a Kafka source to avoid infinite loop
                     if message_json.get("source") != "kafka":
                         continue
                     
@@ -156,7 +159,7 @@ class MQTTToKafkaBridge:
         self.kafka_producer.close()
         self.kafka_consumer.close()
 
-    def get_mqtt_topic_for_kafka_topic(self, kafka_topic) -> str:
+    def get_mqtt_topic_for_kafka_topic(self, kafka_topic: str) -> str:
         """Get the corresponding MQTT topic for a given Kafka topic."""
         logging.info(f"Getting MQTT topic for Kafka topic: {kafka_topic}") #TODO: remove
         try:
