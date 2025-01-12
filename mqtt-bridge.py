@@ -80,14 +80,13 @@ class MQTTToKafkaBridge:
         """Called when an MQTT message is received."""
         
         msg_content: str = msg.payload.decode()
-        
         logging.info(f"Received MQTT message: {msg.topic} -> {msg_content}")
         
         # Check if the message is from MQTT source to avoid infinite loop
         try:
             msg_json: Dict[str, Any] = json.loads(msg_content)
-            logging.info(f"Message JSON: {msg_json}") #TODO DELETE LATER
             if msg_json.get("source") != "mqtt":
+                logging.info("Skipping message from non MQTT source")
                 return
         except json.JSONDecodeError:
             logging.error("Failed to decode MQTT message as JSON")
@@ -112,9 +111,6 @@ class MQTTToKafkaBridge:
             
     def send_message_to_mqtt(self, mqtt_topic: str, message: str) -> None:
         """Send the Kafka message to the specified MQTT topic."""
-        logging.info(f"Sending message to MQTT topic: {mqtt_topic}") #TODO: remove
-        logging.info(f"Message: {message}") #TODO: remove
-        logging.info(f"Message type: {type(message)}") #TODO: remove
         try:
             self.mqtt_client.publish(mqtt_topic, message)
             logging.info(f"Sent message to MQTT topic {mqtt_topic}")
@@ -134,15 +130,14 @@ class MQTTToKafkaBridge:
         while self.running:
             try:
                 for message in self.kafka_consumer:
-                    logging.info(f"Received Kafka message: {message.topic} -> {message.value}") #TODO: remove
+                    logging.info(f"Received Kafka message: {message.topic} -> {message.value}") 
                     message_json = json.loads(message.value.get("message"))
                     
-                    logging.info(f"Message JSON: {message_json}") #TODO DELETE LATER
                     # Check if the message is from a Kafka source to avoid infinite loop
                     if message_json.get("source") != "kafka":
+                        logging.info("Skipping message from non Kafka source")
                         continue
                     
-                    logging.info(f"Will forward message to MQTT") #TODO: remove
                     mqtt_topic = self.get_mqtt_topic_for_kafka_topic(message.topic)
                     if mqtt_topic is not None:
                         self.send_message_to_mqtt(mqtt_topic, json.dumps(message_json))
@@ -161,11 +156,9 @@ class MQTTToKafkaBridge:
 
     def get_mqtt_topic_for_kafka_topic(self, kafka_topic: str) -> str:
         """Get the corresponding MQTT topic for a given Kafka topic."""
-        logging.info(f"Getting MQTT topic for Kafka topic: {kafka_topic}") #TODO: remove
         try:
             for mqtt_topic, kt in CONFIG.KAFKA_TOPIC_MAPPING.items():
                 if kt == kafka_topic:
-                    logging.info(f"Found MQTT topic for Kafka topic: {mqtt_topic}") #TODO: remove
                     return mqtt_topic
             return None
         except Exception as e:
